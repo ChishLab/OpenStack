@@ -66,7 +66,7 @@ NEUTRON_PASS=000000
 METADATA_SECRET=000000
 
 #Tunnel Network Interface. example:x.x.x.x
-INTERFACE_IP=192.168.100.10/192.168.100.20
+INTERFACE_IP=192.168.100.10
 
 #External Network Interface. example:eth1
 INTERFACE_NAME=ens33
