@@ -27,11 +27,11 @@
     - 硬盘容量须比 `controller` 大，自动建立分区，删除 `/home` 分区，如容量 200GiB 应分配 `/` 分区 100GiB ，剩余容量备用
 
 ## 2. 配置网卡、主机名
-> 添加或修改 `/etc/sysconfig/network-scripts/ifcfg-ens*` （具体网卡）文件
+> 添加或修改 `/etc/sysconfig/network-scripts/ifcfg-ens*` (具体网卡) 文件
 - ### 2.1. `controller` 节点
     - 配置网络
         * ens33: 192.168.100.10
-        ```yaml
+        ```conf
         # 仅更改以下内容
         BOOTPROTO=static
         ONBOOT=yes
@@ -42,7 +42,7 @@
         ```
 
         * ens34: 192.168.200.10
-        ```yaml
+        ```conf
         # 仅更改以下内容
         BOOTPROTO=static
         ONBOOT=yes
@@ -52,7 +52,7 @@
         * 重启网卡 : `systemctl restart network`
 
     - 配置主机名
-        ```shell
+        ```sh
         hostnamectl set-hostname controller
         # Ctrl + D Log out and log in again.
         ```
@@ -60,7 +60,7 @@
 - ### 2.2. `compute` 节点
     - 配置网络
         * ens33: 192.168.100.20
-        ```yaml
+        ```conf
         # 仅更改以下内容
         BOOTPROTO=static
         ONBOOT=yes
@@ -71,7 +71,7 @@
         ```
 
         * ens34: 192.168.200.20
-        ```yaml
+        ```conf
         # 仅更改以下内容
         BOOTPROTO=static
         ONBOOT=yes
@@ -81,38 +81,133 @@
         * 重启网卡 : `systemctl restart network`
 
     - 配置主机名
-        ```shell
+        ```sh
         hostnamectl set-hostname compute
         # Ctrl + D Log out and log in again.
         ```
 
 ## 3. 编辑 SELinux 并关闭防火墙
 - ### 3.1. 修改 `SELinux` 为可通过状态 : `vi /etc/selinux/config`
-    ```yaml
+    ```conf
     # 仅更改以下内容
     SELINUX=permissive
     ```
-    * 执行 `setenforce 0` 使selinux立即生效
+    > 执行 `setenforce 0` 使selinux立即生效
 
 - ### 3.2. 关闭防火墙并设置开机不自启
-    ```shell
+    ```sh
     # 关闭防火墙服务进程
     systemctl stop firewalld
     # 关闭防火墙自启
     systemctl disable firewalld
     ```
 
+- ##### 3.3. 连接 CRT 或任意支持连接 SSH 软件，进行下面操作
+
 ## 4. 添加主机映射
 > 修改 `hosts` 添加主机关系 : `vi /etc/hosts` 
 - ### 4.1. `controller` 节点
     ```yaml
-    # ADD
     192.168.100.10 controller
     192.168.100.20 compute
     ```
 - ### 4.2. `compute` 节点
     ```yaml
-    # ADD
     192.168.100.10 controller
     192.168.100.20 compute
+    ```
+
+## 5. 挂载 ISO 文件 (controller 节点)
+> 打开 `controller` 节点虚拟机设置将 `chinaskills_cloud_iaas.iso` CD/DVD的 `已连接` 打开
+- ### 5.1. 挂载 `CentOS-7-x86_64-DVD-1804.iso`
+    ```sh
+    # 查看镜像位置，其为 4.2G 左右
+    lsblk
+    # 挂载 CentOS 镜像，如 sr1 大小为 4.2G 左右，则挂载此目录，否则是 sr0
+    mount /dev/sr1 /mnt/
+    # 创建需要传入数据的目录
+    mkdir /opt/centos
+    # 镜像数据文件传入
+    cp -rvf /mnt/* /opt/centos
+    # 完成后取消挂载
+    umount /mnt/
+    ```
+- ### 5.2. 挂载 `chinaskills_cloud_iaas.iso`
+    ```sh
+    # 查看镜像位置，其为 3.6G 左右
+    lsblk
+    # 挂载 iaas 镜像，如 sr0 大小为 3.6G 左右，则挂载此目录，否则是 sr1
+    mount /dev/sr1 /mnt/
+    # 创建需要传入数据的目录
+    mkdir /opt/iaas
+    # 镜像数据文件传入
+    cp -rvf /mnt/* /opt/iaas
+    # 完成后取消挂载
+    umount /mnt/
+    ```
+
+## 6. 配置 yum 源
+- ### 6.1. yum 源备份 (controller 和 compute 节点)
+    ```sh
+    mkdir /opt/repo
+    mv /etc/yum.repos.d/* /opt/repo/
+    ```
+
+- ### 6.2. 创建 repo 文件
+    > 在 `/etc/yum.repos.d` 创建 centos.repo 源文件 : `vi /etc/yum.repos.d/centos.repo`
+    - controller 节点
+        ```conf
+        [centos]
+        name=centos
+        baseurl=file:///opt/centos
+        gpgcheck=0
+        enabled=1
+        [iaas]
+        name=iaas
+        baseurl=file:///opt/iaas/iaas-repo
+        gpgcheck=0
+        enabled=1
+        ```
+    - compute 节点
+        ```conf
+        [centos]
+        name=centos
+        baseurl=ftp://192.168.100.10/centos
+        gpgcheck=0
+        enabled=1
+        [iaas]
+        name=iaas
+        baseurl=ftp://192.168.100.10/iaas/iaas-repo
+        gpgcheck=0
+        enabled=1
+        ```
+    - 清除缓存并验证 yum 源
+        > 请完成 [**ftp 服务器**](#63-搭建-ftp-服务器开启并设置自启controller-节点) 的搭建，再去 compute 节点执行以下命令，否则 yum 源的验证不会通过
+        ```sh
+        yum clean all
+        yum repolist
+        ```
+
+- ### 6.3. 搭建 ftp 服务器，开启并设置自启（controller 节点）
+    - 安装 vsftpd 包
+        ```sh
+        yum install -y vsftpd
+        ```
+
+    - 编辑 vsftpd 配置文件 : `vi /etc/vsftpd/vsftpd.conf`
+        ```conf
+        # 添加
+        anon_root=/opt/
+        ```
+    
+    - 开启服务并开启自启
+        ```sh
+        systemctl start vsftpd
+        systemctl enable vsftpd
+        ```
+
+## 7. 编辑配置环境变量
+- ### 7.1. 在 `controller` 和 `compute` 节点安装 `iaas-xiandian` 包
+    ```sh
+    yum install iaas-xiandian -y
     ```
