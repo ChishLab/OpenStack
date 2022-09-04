@@ -209,5 +209,55 @@
 ## 7. 编辑配置环境变量
 - ### 7.1. 在 `controller` 和 `compute` 节点安装 `iaas-xiandian` 包
     ```sh
-    yum install iaas-xiandian -y
+    yum install -y iaas-xiandian
     ```
+
+- ### 7.2. 编辑文件 `/etc/xiandian/openrc.sh` ，此文件是安装过程中的各项参数，根据每项参数上一行的说明及服务器实际情况进行配置 : `vi /etc/xiandian/openrc.sh`
+    - 使用正则表达式删除配置文件前的第一个 `#` : `:1,$s/^#//g`
+
+    - 使用正则表达式在 `PASS=` 尾后添加密码 : `:1,$s/PASS=/PASS=000000/g` ，按 `gg` 返回第一行
+
+    - `controller` 节点编辑变量 -> [点击这里查看详情](https://github.com/ChishFoxcat/OpenStack/blob/master/openrc.sh)
+        ```conf
+        HOST_IP=192.168.100.10
+        HOST_NAME=controller
+        HOST_IP_NODE=192.168.100.20
+        HOST_PASS_NODE=000000
+        HOST_NAME_NODE=compute
+        network_segment_IP=192.168.100.0/24
+        RABBIT_USER=openstack
+        DOMAIN_NAME=demo
+        METADATA_SECRET=000000
+        INTERFACE_IP=192.168.100.10
+        INTERFACE_NAME=ens33
+        Physical_NAME=provider
+        minvlan=101
+        maxvlan=200
+        STORAGE_LOCAL_NET_IP=192.168.100.20
+        ```
+
+    - `compute` 节点编辑变量，因为上面已经修改大半直接在 `controller` 节点使用 `scp /etc/xiandian/openrc.sh 192.168.100.20:/etc/xiandian/openrc.sh` 传入 `compute` 节点，修改部分即可
+        ```conf
+        INTERFACE_IP=192.168.100.20
+        ```
+
+## 8. 通过脚本安装服务
+- `controller` 和 `compute` 节点执行脚本 `iaas-pre-host.sh` 进行安装
+- 安装完成后同时重启
+
+## 9. 安装所需相关服务
+- ### 9.1. 安装 Mysql 数据库服务
+    - 在 `controller` 执行脚本 `iaas-install-mysql.sh` 进行安装
+
+- ### 9.2. 安装 Keystone 服务
+    - 在 `controller` 执行脚本 `iaas-install-keystone.sh` 进行安装
+
+- ### 9.3. 安装 Glance 服务
+    - 在 `controller` 执行脚本 `iaas-install-glance.sh` 进行安装
+
+- ### 9.4. 安装 Nova 服务
+    - 在 `controller` 执行脚本 `iaas-install-nova-controller.sh` 进行安装
+    - 在 `compute` 执行脚本 `iaas-install-nova-compute.sh` 进行安装
+
+- ### 9.5. 安装 Dashboard 服务
+    - 在 `controller` 执行脚本 `iaas-install-dashboard.sh` 进行安装
